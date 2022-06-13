@@ -1,0 +1,847 @@
+#include <stdio.h>
+#include <conio.h>
+#include <windows.h>
+#include <time.h>
+#include <iostream>
+#include <fstream>
+#include <winuser.h>
+#define ESC 27
+#define clrscr() system("cls")
+
+using namespace std;
+typedef enum { NOCURSOR, SOLIDCURSOR, NORMALCURSOR } CURSOR_TYPE;
+
+void gotoxy(int x, int y)
+{
+	COORD Cur;
+	Cur.X = x;
+	Cur.Y = y;
+	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), Cur);
+}
+void Wait(DWORD dwMillisecond)
+{
+	MSG msg;
+	DWORD dwStart;
+	dwStart = GetTickCount();
+	while(GetTickCount() - dwStart < dwMillisecond)
+	{
+		while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+	}
+}
+void setcursortype(CURSOR_TYPE c)
+{
+	CONSOLE_CURSOR_INFO CurInfo;
+
+	switch (c) {
+	case NOCURSOR:
+		CurInfo.dwSize = 1;
+		CurInfo.bVisible = FALSE;
+		break;
+	case SOLIDCURSOR:
+		CurInfo.dwSize = 100;
+		CurInfo.bVisible = TRUE;
+		break;
+	case NORMALCURSOR:
+		CurInfo.dwSize = 20;
+		CurInfo.bVisible = TRUE;
+		break;
+	}
+	SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &CurInfo);
+}
+
+int CopyTextToClipboard(const char* ap_string)
+{
+	int string_length = strlen(ap_string) + 1;
+	HANDLE h_data = ::GlobalAlloc(GMEM_DDESHARE | GMEM_MOVEABLE, string_length);
+	char* p_data = (char*)::GlobalLock(h_data);
+	if (NULL != p_data)
+	{
+		memcpy(p_data, ap_string, string_length);
+		::GlobalUnlock(h_data);
+		if (::OpenClipboard(NULL))
+		{
+			::EmptyClipboard();
+			::SetClipboardData(CF_TEXT, h_data);
+			::CloseClipboard();
+		}
+	}
+	return 0;
+}
+char *CopyClipboardToText()
+{
+	unsigned int priority_list = CF_TEXT;
+	char *p_string = NULL;
+	if(::GetPriorityClipboardFormat(&priority_list,1) == CF_TEXT)
+	{
+		if(OpenClipboard(NULL))
+		{
+			HANDLE h_clipboard_data = ::GetClipboardData(CF_TEXT);
+			if(h_clipboard_data != NULL)
+			{
+				char *p_clipboard_data = (char *)::GlobalLock(h_clipboard_data);
+				int string_len = strlen(p_clipboard_data) + 1;
+				p_string = new char [string_len];
+				memcpy(p_string, p_clipboard_data, string_len);
+				::GlobalUnlock(h_clipboard_data);
+			}
+			::CloseClipboard();
+		}	
+	}
+	return p_string;
+}
+void CopyText() // ctrl + c
+{
+	keybd_event(VK_CONTROL, 0, 0, 0);
+	keybd_event(0x43, 0, 0, 0);
+	keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+	keybd_event(0x43, 0, KEYEVENTF_KEYUP, 0);
+	Sleep(300);
+}
+void PasteText() // ctrl + v
+{
+	keybd_event(VK_CONTROL, 0, 0, 0);
+	keybd_event(0x56, 0, 0, 0);
+	keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+	keybd_event(0x56, 0, KEYEVENTF_KEYUP, 0);
+	Sleep(300);
+}
+void FindText() // ctrl + f
+{
+	keybd_event(VK_CONTROL, 0, 0, 0);
+	keybd_event(0x46, 0, 0, 0);
+	keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+	keybd_event(0x46, 0, KEYEVENTF_KEYUP, 0);
+	Sleep(300);
+}
+void MouseLeftClick()
+{
+	mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+	mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+	Sleep(300);
+}
+void MouseLeftDoubleClick()
+{
+	mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+	mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+	Sleep(100);
+	mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+	mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+}
+
+const std::string CurrentDateTime() // 현재시간을 string type으로 return하는 함수
+{
+    time_t now = time(0); //현재 시간을 time_t 타입으로 저장
+    struct tm tstruct;
+    char buf[80];
+    tstruct = *localtime(&now);
+    strftime(buf, sizeof(buf), "%Y%m%d", &tstruct); // YYYYMMDD 형태의 스트링
+
+    return buf;
+}
+int Tmp_Pause()
+{
+	gotoxy(23, 9);
+	cout << "   ";
+	gotoxy(23, 9);
+	cout << "On";
+	while (TRUE)
+	{
+		if (_kbhit() && _getch() == VK_ESCAPE)
+			break;
+		Sleep(500);
+	}
+	gotoxy(23, 9);
+	cout << "Off";
+	return 0;
+}
+
+void printMain()
+{
+	gotoxy(23, 3);
+	cout << "|-----------------------------|";
+	gotoxy(23, 4);
+	cout << "|                             |";
+	gotoxy(25, 4);
+	cout << "임차인 매크로 (ESC to exit)";
+	gotoxy(23, 5);
+	cout << "|-----------------------------|";
+	cout << "  [ver 1.0]";
+	gotoxy(64, 23);
+	cout << "since 2019.10.16";
+
+	gotoxy(26, 8);
+	cout << "1. 부과취소";
+	gotoxy(26, 12);
+	cout << "2. 문서등록";
+	gotoxy(26, 16);
+	cout << "3. 4만원 부과취소";
+}
+void PrintImposition()
+{
+	gotoxy(35, 4);
+	cout << "부과취소" << endl;
+	gotoxy(12, 7);
+	cout << "진행도 : ";
+	gotoxy(62, 7);
+	cout << "(0  %)";
+	gotoxy(12, 9);
+	cout << "일시중지 : Off";
+	gotoxy(12, 11);
+	cout << "예상시간 :   분    초";
+	gotoxy(12, 13);
+	cout << "=====================================================";
+	gotoxy(12, 14);
+	cout << "| 부과번호 :                                        |";
+	gotoxy(12, 15);
+	cout << "|                                                   |";
+	gotoxy(12, 16);
+	cout << "| 차량번호 :                                        |";
+	gotoxy(12, 17);
+	cout << "|                                                   |";
+	gotoxy(12, 18);
+	cout << "| 렌트카 업체 :                                     |";
+	gotoxy(12, 19);
+	cout << "=====================================================";
+}
+void CalPrint(int total, int finish)
+{
+
+	double tmp;
+	int block, min, sec;
+	tmp = ((double)finish / total) * 100;
+	gotoxy(63, 7); // 진행률
+	cout << (int)tmp; 
+	block = tmp / 5;
+	gotoxy(21, 7); // 진행률 시각화블럭
+	for (int i = 0; i < block; i++)
+		cout << "■";
+	for (int j = 0; j < 20 - block; j++)
+		cout << "□";
+	min = (total-finish) / 2;
+	sec = ((total-finish) % 2) * 30;
+	gotoxy(23,11);
+	cout << "  ";
+	gotoxy(23,11);
+	cout << min;
+	gotoxy(29,11);
+	cout << "  ";
+	gotoxy(29,11);
+	cout << sec;
+}
+int CalPrint2(int total, int finish)
+{
+	double tmp;
+	int block, min, sec;
+	tmp = ((double)finish / total) * 100;
+	gotoxy(63, 7); // 진행률
+	cout << (int)tmp; 
+	block = tmp / 5;
+	gotoxy(21, 7); // 진행률 시각화블럭
+	for (int i = 0; i < block; i++)
+		cout << "■";
+	for (int j = 0; j < 20 - block; j++)
+		cout << "□";
+	min = (total-finish) / 4;
+	sec = ((total-finish) % 4) * 15;
+	gotoxy(23,11);
+	cout << "  ";
+	gotoxy(23,11);
+	cout << min;
+	gotoxy(29,11);
+	cout << "  ";
+	gotoxy(29,11);
+	cout << sec;
+}
+void RmPrint()
+{
+	gotoxy(26,14); // 이전부과번호 지우기 
+	cout << "             ";
+	gotoxy(26,16); // 이전 차량번호 지우기
+	cout << "                       ";
+	gotoxy(28,18); // 이전 렌트카업체 지우기
+	cout << "                                  ";
+	gotoxy(13, 21); // 종료메시지 지우기 
+	cout << "                                                       ";
+} 
+void RmPrint2()
+{
+	gotoxy(26,14); // 이전차량번호 지우기 
+	cout << "                       ";
+	gotoxy(29,16); // 이전 렌트카업체 지우기
+	cout << "                                  ";
+	gotoxy(13, 21); // 종료메시지 지우기 
+	cout << "                                                        ";
+}
+int CancelImposition(HWND m_hwnd)
+{	
+	char num[10] = {0,}; // 부과번호 
+	int total = 0, finish = 0; // 전체, 완료 개수 
+	clrscr();
+	PrintImposition();
+
+	ifstream fin;
+	fin.open("number.txt");
+	if (!fin)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(number.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	char none;
+	none = fin.get();
+	if(none == EOF)
+	{	
+		clrscr();
+		gotoxy(25, 10);
+		cout << "Error! : Check file \"number.txt\""<< endl;
+		Sleep(2000);
+		return 0;
+	}
+	while (TRUE) // 개수 구하기 
+	{
+		char c;
+		c = fin.get();
+		if (c == '\n')
+			total++;
+		else if (c == EOF)
+		{
+			total++;
+			break;
+		}
+	}
+	fin.close();
+	
+	FILE* fp = fopen("number.txt", "r");
+	if (fp == NULL)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(number.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	FILE* fp2 = fopen("processing.txt", "a");
+	if (fp2 == NULL)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(processing.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	// 기존 검색 초기화 버튼 
+	SetCursorPos(951,261);
+	MouseLeftClick();
+	keybd_event(VK_F2, 0, 0, 0); 
+	keybd_event(VK_F2, 0, KEYEVENTF_KEYUP, 0);
+	Sleep(500); 
+	
+	while (TRUE)
+	{	
+		SetForegroundWindow(m_hwnd);
+		CalPrint(total,finish); 
+		gotoxy(26,14); // 부과번호 출력
+		fgets(num, 10, fp); // fgets 는 개행문자까지 읽는다		
+		if(finish+1 != total) // 마지막 부과번호가 아니라면 개행문자가 들어가있으므로 제거해줘야함
+			num[strlen(num) - 1] = '\0';
+		cout << num << endl;
+		// 부과취소 과정 30초예상 
+		CopyTextToClipboard(num);
+		SetCursorPos(1387, 445);
+		MouseLeftClick();
+		PasteText();
+		PasteText();
+		keybd_event(VK_F3, 0, 0, 0);  
+		keybd_event(VK_F3, 0, KEYEVENTF_KEYUP, 0);
+		Sleep(6500); // 부과번호 검색시간 
+		SetCursorPos(1094,675);
+		MouseLeftDoubleClick();
+		Sleep(6000); // 대장관리창 켜지는 시간 
+		SetCursorPos(577,677); // 차량번호 좌표
+		MouseLeftClick();
+		CopyText();
+		gotoxy(26,16);
+		cout << CopyClipboardToText();
+		fputs(CopyClipboardToText(),fp2);
+		fputc(' ',fp2);
+		SetCursorPos(1118,385); // 렌트카업체 좌표
+		MouseLeftClick();
+		CopyText();
+		gotoxy(28,18);
+		cout << CopyClipboardToText();
+		fputs(CopyClipboardToText(),fp2);
+		fputc('\n',fp2);
+		SetCursorPos(1158,253);
+		MouseLeftClick();
+		Sleep(1500); // 부과취소버튼 누르는시간 
+		SetCursorPos(917,612);
+		MouseLeftClick(); 
+		Sleep(4000); // '예'누르는 시간 
+		SetCursorPos(951,593);
+		MouseLeftClick(); 
+		Sleep(1000);
+		SetCursorPos(578,801);
+		MouseLeftClick();
+		for(int i = 0; i < 8; i++)
+		{
+			for(int j = 0; j < 10; j++)
+			{
+				if((int)CurrentDateTime()[i] - '0' == j)
+				{
+					keybd_event(48+j, 0, 0, 0);
+					keybd_event(48+j, 0, KEYEVENTF_KEYUP, 0);
+					break;
+				}
+			}
+		}
+		Sleep(1000);
+		CopyTextToClipboard("임차인 부과 변경");
+		PasteText();
+		keybd_event(VK_F7, 0, 0, 0);
+		keybd_event(VK_F7, 0, KEYEVENTF_KEYUP, 0);
+		Sleep(3000); // 저장 시간 
+		SetCursorPos(953,592);
+		MouseLeftClick();
+		Sleep(3000); //확인 시간 
+		SetCursorPos(1478,194);
+		MouseLeftClick(); 
+		
+		finish++; // 부과취소 실행코드 맨 끝에 둔다 
+		SetForegroundWindow(m_hwnd); // 키 입력을 위해 포커스를 둔다. 
+		CalPrint(total, finish);
+		if (finish == total)
+		{
+			for (int i = 5; i > 0; i--)
+			{
+				gotoxy(13, 21);
+				cout << "모든 작업이 완료되었습니다! " << i << "초 뒤에 종료합니다.       ";
+				Sleep(1000);
+			}
+			break;
+		}
+		for (int i = 3; i > 0; i--)
+		{
+			if (_kbhit() && _getch() == VK_ESCAPE)
+				Tmp_Pause();
+			gotoxy(13, 21);
+			cout << "작업이 완료되었습니다! " << i << "초 뒤에 다음 작업을 시작합니다.";
+			Sleep(1000);
+		}	
+		RmPrint();	
+	}
+	fclose(fp2);
+	fclose(fp);
+	clrscr();
+	gotoxy(15, 12);
+	cout << "부과취소 작업이 모두 완료되었습니다.(Press any key)";
+	while (TRUE)
+	{
+		if (_kbhit())
+		{
+			char c = _getch();
+			break;
+		}
+	}
+	return 0;
+}
+void PrintRegistration()
+{
+	gotoxy(35, 4);
+	cout << "문서등록" << endl;
+	gotoxy(12, 7);
+	cout << "진행도 : □□□□□□□□□□□□□□□□□□□□";
+	gotoxy(62, 7);
+	cout << "(0  %)";
+	gotoxy(12, 9);
+	cout << "일시중지 : Off";
+	gotoxy(12, 11);
+	cout << "예상시간 :   분    초";
+	gotoxy(12, 13);
+	cout << "=====================================================";
+	gotoxy(12, 14);
+	cout << "| 차량번호 :                                        |";
+	gotoxy(12, 15);
+	cout << "|                                                   |";
+	gotoxy(12, 16);
+	cout << "| 렌트카 업체 :                                     |";
+	gotoxy(12, 17);
+	cout << "=====================================================";
+}
+
+int RegisterDoc(HWND m_hwnd)
+{
+	char name[50] = {0,};
+	char num[20] = {0,};
+	int total = 0, finish = 0; // 전체, 완료 개수 
+	clrscr();
+	PrintRegistration();
+	ifstream fin;
+	fin.open("processing.txt");
+	if (!fin)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(processing.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	char none;
+	none = fin.get();
+	if(none == EOF)
+	{	
+		clrscr();
+		gotoxy(25, 10);
+		cout << "Error! : Check file \"processing.txt\"" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	while (TRUE) // 개수 구하기 
+	{
+		char c;
+		c = fin.get();
+		if (c == '\n')
+			total++;
+		else if (c == EOF)
+			break;
+	}
+	fin.close();
+	
+	fin.open("processing.txt");
+	if (!fin)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(processing.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	
+	while(TRUE)
+	{
+		SetForegroundWindow(m_hwnd);
+		CalPrint2(total,finish);
+		fin.getline(num, 10, ' ');
+		fin.getline(name, 80, '\n');
+		gotoxy(25,14);
+		cout << num;
+		gotoxy(28,16);
+		cout << name;
+		SetCursorPos(542,234);
+		MouseLeftClick();
+		SetCursorPos(609,258);
+		MouseLeftClick();
+		Sleep(700); //  비전자문서등록 
+		SetCursorPos(654,390);
+		MouseLeftClick();
+		CopyTextToClipboard("렌트카 부과 변경 (");
+		PasteText();
+		CopyTextToClipboard(num);
+		PasteText();
+		keybd_event(VK_SHIFT, 0, 0, 0);
+		keybd_event(0x30, 0, 0, 0);
+		keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
+		keybd_event(0x30, 0, KEYEVENTF_KEYUP, 0);
+		SetCursorPos(654,656);
+		MouseLeftClick();
+		CopyTextToClipboard(name);
+		PasteText();
+		SetCursorPos(722,712);
+		MouseLeftClick();
+		SetCursorPos(659,743);
+		MouseLeftClick();
+		SetCursorPos(735,741);
+		MouseLeftClick();
+		SetCursorPos(875,741);
+		MouseLeftClick();
+		SetCursorPos(657,769);
+		MouseLeftClick();
+		CopyTextToClipboard("개인정보 보호");
+		PasteText() ;
+		SetCursorPos(1367,333);
+		MouseLeftClick(); 
+		Sleep(500); // 접수 
+		SetCursorPos(963,600);
+		MouseLeftClick();
+		CopyTextToClipboard("류찬아");
+		Sleep(2000); // 확인누르면 뜨는새창 
+		FindText();
+		
+		PasteText();
+		SetCursorPos(1267,263);
+		MouseLeftClick();
+		SetCursorPos(982,490);
+		MouseLeftDoubleClick();
+		SetCursorPos(1227,819);
+		MouseLeftClick();
+		
+		finish++; // 실행코드 맨 끝에 둔다 
+		SetForegroundWindow(m_hwnd); // 키 입력을 위해 포커스를 둔다. 
+		CalPrint2(total, finish);
+		if (finish == total)
+		{
+			for (int i = 5; i > 0; i--)
+			{
+				gotoxy(13, 21);
+				cout << "모든 작업이 완료되었습니다! " << i << "초 뒤에 종료합니다.       ";
+				Sleep(1000);
+			}
+			break;
+		}
+		for (int i = 3; i > 0; i--)
+		{
+			if (_kbhit() && _getch() == VK_ESCAPE)
+				Tmp_Pause();
+			gotoxy(13, 21);
+			cout << "작업이 완료되었습니다! " << i << "초 뒤에 다음 작업을 시작합니다.";
+			Sleep(1000);
+		}
+		RmPrint2();	
+	}
+	fin.close();
+	clrscr();
+	gotoxy(15, 12);
+	cout << "문서등록 작업이 모두 완료되었습니다.(Press any key)";
+	while (TRUE)
+	{
+		if (_kbhit())
+		{
+			char c = _getch();
+			break;
+		}
+	}
+	return 0;
+}
+int Exception(HWND m_hwnd)
+{
+	char num[10] = {0,}; // 부과번호 
+	int total = 0, finish = 0; // 전체, 완료 개수 
+	clrscr();
+	PrintImposition();
+
+	ifstream fin;
+	fin.open("exception.txt");
+	if (!fin)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(exception.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	char none;
+	none = fin.get();
+	if(none == EOF)
+	{	
+		clrscr();
+		gotoxy(25, 10);
+		cout << "Error! : Check file \"exception.txt\""<< endl;
+		Sleep(2000);
+		return 0;
+	}
+	while (TRUE) // 개수 구하기 
+	{
+		char c;
+		c = fin.get();
+		if (c == '\n')
+			total++;
+		else if (c == EOF)
+		{
+			total++;
+			break;
+		}
+	}
+	fin.close();
+	
+	FILE* fp = fopen("exception.txt", "r");
+	if (fp == NULL)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(exception.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	FILE* fp2 = fopen("processing.txt", "a");
+	if (fp2 == NULL)
+	{
+		clrscr();
+		gotoxy(25, 10);
+		cout << "cannot open file!(processing.txt)" << endl;
+		Sleep(2000);
+		return 0;
+	}
+	// 기존 검색 초기화 버튼 
+	SetCursorPos(951,261);
+	MouseLeftClick();
+	keybd_event(VK_F2, 0, 0, 0); 
+	keybd_event(VK_F2, 0, KEYEVENTF_KEYUP, 0);
+	Sleep(500); 
+	
+	while (TRUE)
+	{	
+		SetForegroundWindow(m_hwnd);
+		CalPrint(total,finish); 
+		gotoxy(26,14); // 부과번호 출력
+		fgets(num, 10, fp); // fgets 는 개행문자까지 읽는다		
+		if(finish+1 != total) // 마지막 부과번호가 아니라면 개행문자가 들어가있으므로 제거해줘야함
+			num[strlen(num) - 1] = '\0';
+		cout << num << endl;
+		// 부과취소 과정 30초예상 
+		CopyTextToClipboard(num);
+		SetCursorPos(1387, 445);
+		MouseLeftClick();
+		PasteText();
+		PasteText();
+		keybd_event(VK_F3, 0, 0, 0);  
+		keybd_event(VK_F3, 0, KEYEVENTF_KEYUP, 0);
+		Sleep(6500); // 부과번호 검색시간 
+		SetCursorPos(1094,675);
+		MouseLeftDoubleClick();
+		Sleep(6000); // 대장관리창 켜지는 시간 
+		SetCursorPos(577,677); // 차량번호 좌표
+		MouseLeftClick();
+		CopyText();
+		gotoxy(26,16);
+		cout << CopyClipboardToText();
+		fputs(CopyClipboardToText(),fp2);
+		fputc(' ',fp2);
+		SetCursorPos(1118,385); // 렌트카업체 좌표
+		MouseLeftClick();
+		CopyText();
+		gotoxy(28,18);
+		cout << CopyClipboardToText();
+		fputs(CopyClipboardToText(),fp2);
+		fputc('\n',fp2);
+		SetCursorPos(1095,250);
+		MouseLeftClick();
+		Sleep(1500); // 부과취소버튼 누르는시간 
+		SetCursorPos(915,593);
+		MouseLeftClick(); 
+		Sleep(4000); // '예'누르는 시간 
+		SetCursorPos(953,591);
+		MouseLeftClick(); 
+		Sleep(1000);
+		SetCursorPos(578,801);
+		MouseLeftClick();
+		for(int i = 0; i < 8; i++)
+		{
+			for(int j = 0; j < 10; j++)
+			{
+				if((int)CurrentDateTime()[i] - '0' == j)
+				{
+					keybd_event(48+j, 0, 0, 0);
+					keybd_event(48+j, 0, KEYEVENTF_KEYUP, 0);
+					break;
+				}
+			}
+		}
+		Sleep(1000);
+		CopyTextToClipboard("임차인 부과 변경");
+		PasteText();
+		keybd_event(VK_F7, 0, 0, 0);
+		keybd_event(VK_F7, 0, KEYEVENTF_KEYUP, 0);
+		Sleep(3000); // 저장 시간 
+		SetCursorPos(953,592);
+		MouseLeftClick();
+		Sleep(3000); //확인 시간 
+		SetCursorPos(1478,194);
+		MouseLeftClick(); 
+		
+		finish++; // 부과취소 실행코드 맨 끝에 둔다 
+		SetForegroundWindow(m_hwnd); // 키 입력을 위해 포커스를 둔다. 
+		CalPrint(total, finish);
+		if (finish == total)
+		{
+			for (int i = 5; i > 0; i--)
+			{
+				gotoxy(13, 21);
+				cout << "모든 작업이 완료되었습니다! " << i << "초 뒤에 종료합니다.       ";
+				Sleep(1000);
+			}
+			break;
+		}
+		for (int i = 3; i > 0; i--)
+		{
+			if (_kbhit() && _getch() == VK_ESCAPE)
+				Tmp_Pause();
+			gotoxy(13, 21);
+			cout << "작업이 완료되었습니다! " << i << "초 뒤에 다음 작업을 시작합니다.";
+			Sleep(1000);
+		}	
+		RmPrint();	
+	}
+	fclose(fp2);
+	fclose(fp);
+	clrscr();
+	gotoxy(15, 12);
+	cout << "부과취소 작업이 모두 완료되었습니다.(Press any key)";
+	while (TRUE)
+	{
+		if (_kbhit())
+		{
+			char c = _getch();
+			break;
+		}
+	}
+	return 0;
+}
+
+enum { CANCEL = 1, REGISTER, EXCEPTION };
+
+int main()
+{
+	system("title macro.exe");
+	HWND m_hwnd = GetForegroundWindow();
+	::SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE); // 최상위윈도우 
+	SetForegroundWindow(m_hwnd); // 포커스 취상위 
+	
+	int select;
+	bool escape;
+	setcursortype(NOCURSOR);
+	while (1)
+	{
+		clrscr();
+		printMain();
+		escape = FALSE;
+		while (1)
+		{
+			if (_kbhit())
+			{
+				select = _getch() - '0';
+				switch (select)
+				{
+				case CANCEL:
+					CancelImposition(m_hwnd);
+					escape = TRUE;
+					break;
+				case REGISTER:
+					RegisterDoc(m_hwnd);
+					escape = TRUE;
+					break;
+				case EXCEPTION:
+					Exception(m_hwnd);
+					escape = TRUE;
+					break;
+				case ESC - '0':
+					return 0;
+				default:
+					gotoxy(45, 12);
+					cout << "!Message : Wrong number!";
+					Sleep(1000);
+					escape = TRUE;
+					break;
+				}
+			}
+			if (escape == TRUE) // 함수 실행 후 반복문 탈출 
+				break;
+		}
+	}
+
+	return 0;
+}
